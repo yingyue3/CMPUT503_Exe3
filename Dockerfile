@@ -1,5 +1,5 @@
 # parameters
-ARG REPO_NAME="CMPUT_503 exe3"
+ARG REPO_NAME="CMPUT503_Exe3"
 ARG DESCRIPTION="This is the clean repo for execercise 3"
 ARG MAINTAINER="Yingyue Cao (yingyue3@ualberta.ca) Sarah"
 # pick an icon from: https://fontawesome.com/v4.7.0/icons/
