@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
 
+# potentially useful for question - 1.1 - 1.4 and 2.1
+
+# import required libraries
 import os
 import rospy
 from duckietown.dtros import DTROS, NodeType
@@ -9,43 +12,56 @@ import numpy as np
 import cv2 as cv
 from cv_bridge import CvBridge
 
-class CameraReaderNode(DTROS):
-
+class LaneDetectionNode(DTROS):
     def __init__(self, node_name):
-        # initialize the DTROS parent class
-        super(CameraReaderNode, self).__init__(node_name=node_name, node_type=NodeType.VISUALIZATION)
+        super(LaneDetectionNode, self).__init__(node_name=node_name, node_type=NodeType.PERCEPTION)
+        # add your code here
         # static parameters
         self._vehicle_name = os.environ['VEHICLE_NAME']
         self._camera_topic = f"/{self._vehicle_name}/camera_node/image/compressed"
         self._camera_info = f"/{self._vehicle_name}/camera_node/camera_info"
-        # bridge between OpenCV and ROS
-        self._bridge = CvBridge()
-        rospy.loginfo("Camera parameters finding...")
-        # construct subscriber
-        self.sub_info = rospy.Subscriber(self._camera_info, CameraInfo, self.callback_info)
-        self.sub_image = rospy.Subscriber(self._camera_topic, CompressedImage, self.callback_image)
-
+        # camera calibration parameters (intrinsic matrix and distortion coefficients)
         self.K = None
         self.D = None
+        self.sub_info = rospy.Subscriber(self._camera_info, CameraInfo, self.callback_info)
+        
+        # color detection parameters in HSV format
+        # Set range for red color
+        # self.red_lower = np.array([136, 87, 111], np.uint8) 
+        # self.red_upper = np.array([180, 255, 255], np.uint8) 
+
+        # while bound
+        self.red_lower = np.array([0, 0, 177], np.uint8)
+        self.red_upper = np.array([180, 40, 190], np.uint8)
+
+        # Set range for green color 
+        # self.green_lower = np.array([36, 52, 72], np.uint8) 
+        # self.green_upper = np.array([102, 200, 200], np.uint8) 
+
+        # yellow bound
+        self.green_lower = np.array([25, 50, 70], np.uint8) 
+        self.green_upper = np.array([35, 255, 255], np.uint8) 
+
+        # Set range for blue color 
+        self.blue_lower = np.array([110, 80, 80], np.uint8) 
+        self.blue_upper = np.array([120, 200, 200], np.uint8) 
+        
+        # initialize bridge and subscribe to camera feed
+        self._bridge = CvBridge()
+        self.disorted_image = None
+        self.color_detect_image = None
+        self.sub_image = rospy.Subscriber(self._camera_topic, CompressedImage, self.callback_image)
+
+        # lane detection publishers
         self._custom_topic = f"/{self._vehicle_name}/custom_node/image/compressed"
         self.pub = rospy.Publisher(self._custom_topic, Image) # queue_size=10
-        self.disorted_image = None
 
-    def callback_image(self, msg):
-        # convert JPEG bytes to CV image
-        rate = rospy.Rate(3)
-        if self.K is None:
-            return
-        image = self._bridge.compressed_imgmsg_to_cv2(msg)
-        # https://docs.opencv.org/4.x/dc/dbb/tutorial_py_calibration.html
-        h,w = image.shape[:2]
-        newcameramtx, roi = cv.getOptimalNewCameraMatrix(self.K, self.D, (w,h), 1, (w,h))
-        dst = cv.undistort(image, self.K, self.D, None, newcameramtx)
-        x, y, w, h = roi
-        dst = dst[y:y+h, x:x+w]
-        self.disorted_image = dst
-        rospy.loginfo("Image Calibrated")
-        rate.sleep()
+        # LED
+        
+        # ROI vertices
+        
+        # define other variables as needed
+        self.image_publish()
 
     def callback_info(self, msg):
         rate = rospy.Rate(1)
@@ -54,62 +70,76 @@ class CameraReaderNode(DTROS):
         # https://github.com/IntelRealSense/realsense-ros/issues/709ss
         self.K = np.array(msg.K).reshape(3, 3)
         self.D = np.array(msg.D)
-        rospy.loginfo("Camera parameters received.")
+        # rospy.loginfo("Camera parameters received.")
         rate.sleep()
-    
-    def start(self):
-        # https://stackoverflow.com/questions/55377442/how-to-subscribe-and-publish-images-in-ros
-        rate = rospy.Rate(3)
-        while not rospy.is_shutdown():       
-            if self.disorted_image is not None:
-                # rospy.loginfo('publishing image')
-                image_msg = self._bridge.cv2_to_imgmsg(self.disorted_image, encoding="bgr8")
-                self.pub.publish(image_msg)
-            #self.pub.publish(self.raw_image)
-            rate.sleep()
 
-    def color_detect_start(self):
-        rate = rospy.Rate(3)
-        while not rospy.is_shutdown():       
-            if self.disorted_image is not None:
-                self.color_detect()
-                # rospy.loginfo('publishing image')
-                image_msg = self._bridge.cv2_to_imgmsg(self.color_detect_image, encoding="bgr8")
-                self.pub.publish(image_msg)
-            #self.pub.publish(self.raw_image)
-            rate.sleep()
+    def callback_image(self, msg):
+        # add your code here
         
-    def image_preprocess(self):
-        new_width = 400
-        new_height = 300
-        resized_image = cv.resize(self.disorted_image, (new_width, new_height), interpolation = cv.INTER_AREA)
-        blurred_image = cv.blur(resized_image, (5, 5)) 
-        return blurred_image
-    
-    def color_detect(self):
+        # convert compressed image to CV2
+        rate = rospy.Rate(3)
+        if self.K is None:
+            return
+        image = self._bridge.compressed_imgmsg_to_cv2(msg)
+        # undistort image
+        dst = self.undistort_image(image)
+        # preprocess image
+        imageFrame = self.preprocess_image(dst).astype(np.uint8)
+        self.disorted_image = imageFrame
+        rospy.loginfo("Image Calibrated")
+        # detect lanes - 2.1 
+
+        # publish lane detection results
+        
+        # detect lanes and colors - 1.3
+        # publish undistorted image
+        self.color_detect_image = self.detect_lane_color(self.disorted_image)
+        # control LEDs based on detected colors
+
+        # anything else you want to add here
+        rate.sleep()
+
+        
+
+    def undistort_image(self, image):
+        # convert JPEG bytes to CV image
         # rate = rospy.Rate(3)
         if self.K is None:
             return
-        imageFrame = self.image_preprocess().astype(np.uint8)
+        # https://docs.opencv.org/4.x/dc/dbb/tutorial_py_calibration.html
+        h,w = image.shape[:2]
+        newcameramtx, roi = cv.getOptimalNewCameraMatrix(self.K, self.D, (w,h), 1, (w,h))
+        dst = cv.undistort(image, self.K, self.D, None, newcameramtx)
+        x, y, w, h = roi
+        dst = dst[y:y+h, x:x+w]
+        # rospy.loginfo("Image Calibrated")
+        return dst
+        # rate.sleep()
+
+    def preprocess_image(self, raw_image):
+        new_width = 400
+        new_height = 300
+        resized_image = cv.resize(raw_image, (new_width, new_height), interpolation = cv.INTER_AREA)
+        blurred_image = cv.blur(resized_image, (5, 5)) 
+        return blurred_image
+    
+    def detect_lane_color(self, imageFrame):
+        # rate = rospy.Rate(3)
+        if self.K is None:
+            return None
         hsvFrame = cv.cvtColor(imageFrame, cv.COLOR_BGR2HSV)
 
         # Set range for red color and 
         # define mask 
-        red_lower = np.array([136, 87, 111], np.uint8) 
-        red_upper = np.array([180, 255, 255], np.uint8) 
-        red_mask = cv.inRange(hsvFrame, red_lower, red_upper) 
+        red_mask = cv.inRange(hsvFrame, self.red_lower, self.red_upper) 
 
         # Set range for green color and 
         # define mask 
-        green_lower = np.array([36, 50, 70], np.uint8) 
-        green_upper = np.array([89, 255, 255], np.uint8) 
-        green_mask = cv.inRange(hsvFrame, green_lower, green_upper) 
+        green_mask = cv.inRange(hsvFrame, self.green_lower, self.green_upper) 
 
         # Set range for blue color and 
         # define mask 
-        blue_lower = np.array([100, 50, 70], np.uint8) 
-        blue_upper = np.array([120, 255, 255], np.uint8) 
-        blue_mask = cv.inRange(hsvFrame, blue_lower, blue_upper) 
+        blue_mask = cv.inRange(hsvFrame, self.blue_lower, self.blue_upper) 
 
         # Morphological Transform, Dilation 
         # for each color and bitwise_and operator 
@@ -180,12 +210,25 @@ class CameraReaderNode(DTROS):
                 cv.putText(imageFrame, "Blue Colour", (x, y), 
                             cv.FONT_HERSHEY_SIMPLEX, 
                             1.0, (255, 0, 0)) 
-        self.color_detect_image = imageFrame   
+        return imageFrame  
+    
+    def detect_lane(self, **kwargs):
+        # add your code here
+        # potentially useful in question 2.1
+        pass
     
 
+    # add other functions as needed
+    def image_publish(self):
+        rate = rospy.Rate(3)
+        while not rospy.is_shutdown():       
+            if self.color_detect_image is not None:
+                # rospy.loginfo('publishing image')
+                image_msg = self._bridge.cv2_to_imgmsg(self.color_detect_image, encoding="bgr8")
+                self.pub.publish(image_msg)
+            #self.pub.publish(self.raw_image)
+        rate.sleep()
+
 if __name__ == '__main__':
-    # create the node
-    node = CameraReaderNode(node_name='camera_reader_node')
-    node.color_detect_start()
-    # keep spinning
+    node = LaneDetectionNode(node_name='lane_detection_node')
     rospy.spin()
