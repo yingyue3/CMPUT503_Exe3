@@ -27,24 +27,25 @@ class LaneDetectionNode(DTROS):
         
         # color detection parameters in HSV format
         # Set range for red color
-        # self.red_lower = np.array([136, 87, 111], np.uint8) 
-        # self.red_upper = np.array([180, 255, 255], np.uint8) 
+        self.red_lower = np.array([135, 80, 100], np.uint8) 
+        self.red_upper = np.array([190, 255, 255], np.uint8) 
 
-        # while bound
-        self.red_lower = np.array([0, 0, 177], np.uint8)
-        self.red_upper = np.array([180, 40, 190], np.uint8)
 
         # Set range for green color 
-        # self.green_lower = np.array([36, 52, 72], np.uint8) 
-        # self.green_upper = np.array([102, 200, 200], np.uint8) 
-
-        # yellow bound
-        self.green_lower = np.array([25, 50, 70], np.uint8) 
-        self.green_upper = np.array([35, 255, 255], np.uint8) 
+        self.green_lower = np.array([36, 52, 72], np.uint8) 
+        self.green_upper = np.array([102, 180, 180], np.uint8) 
 
         # Set range for blue color 
         self.blue_lower = np.array([110, 80, 80], np.uint8) 
         self.blue_upper = np.array([120, 200, 200], np.uint8) 
+
+        # yellow bound
+        # self.yellow_lower = np.array([25, 50, 70], np.uint8) 
+        # self.yellow_upper = np.array([35, 255, 255], np.uint8) 
+
+        # white bound
+        # self.white_lower = np.array([0, 0, 177], np.uint8)
+        # self.white_upper = np.array([180, 40, 190], np.uint8)
         
         # initialize bridge and subscribe to camera feed
         self._bridge = CvBridge()
