@@ -83,7 +83,7 @@ class NavigationControl(DTROS):
         self.pub.publish(msg)
         pass
         
-    def move_straight(self,  speed=0.2, direction=1, distance=1.25, calibrate = 1):
+    def move_straight(self,  speed=0.2, direction=1, distance=0.3, calibrate = 1):
         # add your code here
         msg = WheelsCmdStamped()
         msg.vel_left = speed * direction 
@@ -99,18 +99,18 @@ class NavigationControl(DTROS):
         self.pub.publish(msg)
         pass
         
-    def turn_right(self, speed=0.2):
+    def turn_right(self, speed=0.2, calibrate = 1):
         # add your code here
         msg = WheelsCmdStamped()
-        msg.vel_left = speed 
-        msg.vel_right = 0
+        msg.vel_left = speed * 0.38
+        msg.vel_right = speed * calibrate
 
         # Calculate target rotation distance (90 degrees)
          
         self.start_dist = self.compute_distance_traveled(self._ticks_left)
 
 
-        while np.abs(self.start_dist - self.compute_distance_traveled(self._ticks_left)) < self.ROTATION_TARGET and not rospy.is_shutdown():
+        while np.abs(self.start_dist - self.compute_distance_traveled(self._ticks_left)) < self.ARC_TARGET and not rospy.is_shutdown():
             self.pub.publish(msg)
 
 
@@ -118,6 +118,7 @@ class NavigationControl(DTROS):
         msg.vel_left = 0
         msg.vel_right = 0
         self.pub.publish(msg)
+        rospy.loginfo("Rotation arc complete (90 degrees clockwise).")
         pass
         
     def turn_left(self, speed=0.2, calibrate = 1):

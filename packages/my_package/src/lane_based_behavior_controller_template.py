@@ -182,15 +182,66 @@ class BehaviorController(DTROS):
                 if y + h > 200:
                     self.line_disappear = True
         return imageFrame
+    
+    def use_leds(self, color):
+
+        x = (0.0, 0.0, 1.0, 1.0)
+        
+        msg = LEDPattern()
+        msg.header = Header()
+        msg.header.stamp = rospy.Time.now()
+        color_msg = ColorRGBA()
+        color_msg.r, color_msg.g, color_msg.b, color_msg.a = static_color
+
+        color_list = [color_msg] * 5
+        
+
+        # Set LED colors
+        msg.rgb_vals = [color_msg] * 5
+        self.led_pub.publish(msg) 
 
 
     def execute_blue_line_behavior(self, **kwargs):
-        # add your code here
-        pass
+        # static color: blue
+        static_color = (0.0, 0.0, 1.0, 1.0)
+        # signal color: red
+        signal = (1.0, 0.0, 0.0, 1.0)
+        msg = LEDPattern()
+        msg.header = Header()
+        msg.header.stamp = rospy.Time.now()
+        color_msg = ColorRGBA()
+        color_msg.r, color_msg.g, color_msg.b, color_msg.a = static_color
+        signal_msg = ColorRGBA()
+        signal_msg.r, signal_msg.g, signal_msg.b, signal_msg.a = signal
+
+        color_list = [color_msg] * 5
+        color_list[1] = [signal_msg]
+        color_list[4] = [signal_msg]
+
+        msg.rgb_vals = color_list
+        self.led_pub.publish(msg) 
+
+
         
-    def execute_red_line_behavior(self, **kwargs):
-        # add your code here
-        pass
+    def execute_green_line_behavior(self, **kwargs):
+        # static color: blue
+        static_color = (0.0, 0.0, 1.0, 1.0)
+        # signal color: red
+        signal = (1.0, 0.0, 0.0, 1.0)
+        msg = LEDPattern()
+        msg.header = Header()
+        msg.header.stamp = rospy.Time.now()
+        color_msg = ColorRGBA()
+        color_msg.r, color_msg.g, color_msg.b, color_msg.a = static_color
+        signal_msg = ColorRGBA()
+        signal_msg.r, signal_msg.g, signal_msg.b, signal_msg.a = signal
+
+        color_list = [color_msg] * 5
+        color_list[2] = [signal_msg]
+        color_list[5] = [signal_msg]
+
+        msg.rgb_vals = color_list
+        self.led_pub.publish(msg) 
         
     def execute_yellow_line_behavior(self, **kwargs):
         # add your code here
@@ -204,12 +255,17 @@ class BehaviorController(DTROS):
             message = "left"
         elif self.color == "b":
             message = "right"
+        self.use_leds()
         while not rospy.is_shutdown():
             if self.color_detect_image is not None:
                 # rospy.loginfo('publishing image')
                 image_msg = self._bridge.cv2_to_imgmsg(self.color_detect_image, encoding="bgr8")
                 self.pub.publish(image_msg)
             if self.line_disappear and not self.executed:
+                if self.color == "g":
+                    self.execute_green_line_behavior()
+                elif self.color == "b":
+                    self.execute_blue_line_behavior()
                 self.string_pub.publish(message)
                 # self.executed = True
                 rospy.loginfo(message)
