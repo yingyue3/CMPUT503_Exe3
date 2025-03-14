@@ -49,11 +49,13 @@ class NavigationControl(DTROS):
         self.instruction = None
         self.executed = False
 
-        self.control_start()
+        # self.control_start()
     
     def callback_string(self, data):
         # rospy.loginfo("I heard '%s'", data.data)
         self.instruction = data.data
+        # rospy.loginfo(self.instruction)
+        # self.control_start()
 
     def callback_left(self, data):
         self._ticks_left = data.data
@@ -83,11 +85,11 @@ class NavigationControl(DTROS):
         self.pub.publish(msg)
         pass
         
-    def move_straight(self,  speed=0.2, direction=1, distance=0.3, calibrate = 1):
+    def move_straight(self,  speed=0.5, direction=1, distance=0.3, calibrate = 1.3):
         # add your code here
         msg = WheelsCmdStamped()
-        msg.vel_left = speed * direction 
-        msg.vel_right = speed * direction * calibrate
+        msg.vel_left = speed * direction * 1.3
+        msg.vel_right = speed * direction
 
         self.start_dist = self.compute_distance_traveled(self._ticks_left)
 
@@ -99,11 +101,11 @@ class NavigationControl(DTROS):
         self.pub.publish(msg)
         pass
         
-    def turn_right(self, speed=0.2, calibrate = 1):
+    def turn_right(self, speed=0.7, calibrate = 1):
         # add your code here
         msg = WheelsCmdStamped()
-        msg.vel_left = speed * 0.38
-        msg.vel_right = speed * calibrate
+        msg.vel_left = speed * calibrate
+        msg.vel_right = speed * 0.38
 
         # Calculate target rotation distance (90 degrees)
          
@@ -121,12 +123,12 @@ class NavigationControl(DTROS):
         rospy.loginfo("Rotation arc complete (90 degrees clockwise).")
         pass
         
-    def turn_left(self, speed=0.2, calibrate = 1):
+    def turn_left(self, speed=0.7, calibrate = 1):
         # add your code here
         msg = WheelsCmdStamped()
-        msg.vel_left = speed * calibrate
+        msg.vel_left = speed * 0.38
         # msg.vel_right = -speed *0.8
-        msg.vel_right = speed * 0.38
+        msg.vel_right = speed * calibrate
 
         # self._ticks_left = 0  
         # self._ticks_right = 0
@@ -156,34 +158,39 @@ class NavigationControl(DTROS):
         msg.vel_left = 0
         msg.vel_right = 0
         self.pub.publish(msg)
+        rospy.loginfo("robot stopped")
 
     def control_start(self):
-        try:
-            while not self.executed:
-                msg = WheelsCmdStamped()
-                msg.vel_left = 0.2
-                msg.vel_right = 0.2
-                self.pub.publish(msg)
-                if self.instruction is not None:
-                    rospy.loginfo("stop")
-                    self.stop_robot()
-                    rospy.sleep(5)
-                    if self.instruction == "left":
-                        rospy.loginfo("turn left")
-                        self.turn_left()
-                        self.executed = True
-                    elif self.instruction == "right":
-                        self.turn_right()
-                        self.executed = True
-                    elif self.instruction == "straight":
-                        self.move_straight()
-                        self.executed = True
-        except:
-            self.stop_robot() 
+            # rospy.sleep(5)
+        while not self.executed:
+            msg = WheelsCmdStamped()
+            msg.vel_left = 0.4 * 1.2
+            msg.vel_right = 0.4 * 0.9
+            self.pub.publish(msg)
+            rospy.loginfo("move")
+            if self.instruction is not None:
+                rospy.loginfo("stop")
+                self.stop_robot()
+                rospy.sleep(5)
+                if self.instruction == "left":
+                    rospy.loginfo("turn left")
+                    self.turn_left(calibrate = 0.7)
+                    self.executed = True
+                elif self.instruction == "right":
+                    self.turn_right()
+                    self.executed = True
+                elif self.instruction == "straight":
+                    rospy.loginfo("move straight started")
+                    self.move_straight()
+                    self.executed = True
+                rospy.loginfo("executed")
                     
                         
 
 
 if __name__ == '__main__':
     node = NavigationControl(node_name='navigation_control_node')
+    # node.turn_left(calibrate = 0.5)
+
+    node.control_start()
     rospy.spin()

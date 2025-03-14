@@ -34,7 +34,7 @@ class BehaviorController(DTROS):
         
         # color detection parameters in HSV format
         # Set range for red color
-        self.red_lower = np.array([135, 80, 100], np.uint8) 
+        self.red_lower = np.array([130, 70, 80], np.uint8) 
         self.red_upper = np.array([190, 255, 255], np.uint8) 
 
 
@@ -45,18 +45,19 @@ class BehaviorController(DTROS):
         # Set range for blue color 
         self.blue_lower = np.array([110, 80, 80], np.uint8) 
         self.blue_upper = np.array([120, 200, 200], np.uint8) 
-        
+        rospy.loginfo("Starting")
         # initialize bridge and subscribe to camera feed
         self._bridge = CvBridge()
         self.disorted_image = None
         self.color_detect_image = None
         self.sub_image = rospy.Subscriber(self._camera_topic, CompressedImage, self.callback_image)
+        
 
         # lane detection publishers
         self._string_topic = f"/{self._vehicle_name}/control_node/control"
-        self.string_pub = rospy.Publisher(self._string_topic, String) # queue_size=10
+        self.string_pub = rospy.Publisher(self._string_topic, String, queue_size=1) # queue_size=10
         self._custom_topic = f"/{self._vehicle_name}/custom_node/image/compressed"
-        self.pub = rospy.Publisher(self._custom_topic, Image) # queue_size=10
+        self.pub = rospy.Publisher(self._custom_topic, Image, queue_size = 1) # queue_size=10
 
         # call navigation control node
 
@@ -67,31 +68,33 @@ class BehaviorController(DTROS):
         self.executed = False
         self.line_disappear = False
 
-        self.execute_publish()
+        # self.execute_publish()
 
 
     def callback_info(self, msg):
-        rate = rospy.Rate(1)
+        # rate = rospy.Rate(2)
         # https://stackoverflow.com/questions/55781120/subscribe-ros-image-and-camerainfo-sensor-msgs-format
         # http://docs.ros.org/en/noetic/api/sensor_msgs/html/msg/CameraInfo.html
         # https://github.com/IntelRealSense/realsense-ros/issues/709ss
         self.K = np.array(msg.K).reshape(3, 3)
         self.D = np.array(msg.D)
         # rospy.loginfo("Camera parameters received.")
-        rate.sleep()
+        # rate.sleep()
 
     def callback_image(self, msg):
         # add your code here
         
         # convert compressed image to CV2
-        # rate = rospy.Rate(3)
+        rate = rospy.Rate(20)
         if self.K is None:
             return
         image = self._bridge.compressed_imgmsg_to_cv2(msg)
+        # preprocess image
+        imageFrame = self.preprocess_image(image).astype(np.uint8)
         # undistort image
         dst = self.undistort_image(image)
-        # preprocess image
-        imageFrame = self.preprocess_image(dst).astype(np.uint8)
+        # # preprocess image
+        # imageFrame = self.preprocess_image(dst).astype(np.uint8)
         self.disorted_image = imageFrame
         # rospy.loginfo("Image Calibrated")
         # detect lanes - 2.1 
@@ -105,6 +108,7 @@ class BehaviorController(DTROS):
 
         # anything else you want to add here
         # rate.sleep()
+        self.execute_publish()
 
     def undistort_image(self, image):
         # convert JPEG bytes to CV image
@@ -122,8 +126,8 @@ class BehaviorController(DTROS):
         # rate.sleep()
 
     def preprocess_image(self, raw_image):
-        new_width = 400
-        new_height = 300
+        new_width = 200
+        new_height = 150
         resized_image = cv.resize(raw_image, (new_width, new_height), interpolation = cv.INTER_AREA)
         blurred_image = cv.blur(resized_image, (5, 5)) 
         return blurred_image
@@ -151,7 +155,7 @@ class BehaviorController(DTROS):
     def detect_line(self, imageFrame):
         hsvFrame = cv.cvtColor(imageFrame, cv.COLOR_BGR2HSV)
         # red mask
-        rospy.loginfo("line detecting")
+        # rospy.loginfo("line detecting")
         if self.color == 'r':
             mask = cv.inRange(hsvFrame, self.red_lower, self.red_upper) 
         elif self.color == "g":
@@ -169,21 +173,21 @@ class BehaviorController(DTROS):
 
         for pic, contour in enumerate(contours): 
             area = cv.contourArea(contour) 
-            if(area > 300): 
+            if(area > 100): 
                 x, y, w, h = cv.boundingRect(contour) 
                 rospy.loginfo(y+h)
-                imageFrame = cv.rectangle(imageFrame, (x, y), 
-                                        (x + w, y + h), 
-                                        (0, 0, 255), 2) 
+                # imageFrame = cv.rectangle(imageFrame, (x, y), 
+                #                         (x + w, y + h), 
+                #                         (0, 0, 255), 2) 
                 
-                cv.putText(imageFrame, "Colour", (x, y), 
-                            cv.FONT_HERSHEY_SIMPLEX, 1.0, 
-                            (0, 0, 255))
-                if y + h > 200:
+                # cv.putText(imageFrame, "Colour", (x, y), 
+                #             cv.FONT_HERSHEY_SIMPLEX, 1.0, 
+                #             (0, 0, 255))
+                if y + h > 110:
                     self.line_disappear = True
         return imageFrame
     
-    def use_leds(self, color):
+    def use_leds(self):
 
         x = (0.0, 0.0, 1.0, 1.0)
         
@@ -191,7 +195,7 @@ class BehaviorController(DTROS):
         msg.header = Header()
         msg.header.stamp = rospy.Time.now()
         color_msg = ColorRGBA()
-        color_msg.r, color_msg.g, color_msg.b, color_msg.a = static_color
+        color_msg.r, color_msg.g, color_msg.b, color_msg.a = x
 
         color_list = [color_msg] * 5
         
@@ -203,7 +207,7 @@ class BehaviorController(DTROS):
 
     def execute_blue_line_behavior(self, **kwargs):
         # static color: blue
-        static_color = (0.0, 0.0, 1.0, 1.0)
+        static_color = (0.0, 1.0, 0.0, 1.0)
         # signal color: red
         signal = (1.0, 0.0, 0.0, 1.0)
         msg = LEDPattern()
@@ -215,8 +219,8 @@ class BehaviorController(DTROS):
         signal_msg.r, signal_msg.g, signal_msg.b, signal_msg.a = signal
 
         color_list = [color_msg] * 5
-        color_list[1] = [signal_msg]
-        color_list[4] = [signal_msg]
+        color_list[1] = signal_msg
+        color_list[4] = signal_msg
 
         msg.rgb_vals = color_list
         self.led_pub.publish(msg) 
@@ -237,8 +241,8 @@ class BehaviorController(DTROS):
         signal_msg.r, signal_msg.g, signal_msg.b, signal_msg.a = signal
 
         color_list = [color_msg] * 5
-        color_list[2] = [signal_msg]
-        color_list[5] = [signal_msg]
+        color_list[0] = signal_msg
+        color_list[3] = signal_msg
 
         msg.rgb_vals = color_list
         self.led_pub.publish(msg) 
@@ -248,7 +252,7 @@ class BehaviorController(DTROS):
         pass
 
     def execute_publish(self):
-        # rate = rospy.Rate(3)
+        rate = rospy.Rate(20)
         if self.color == 'r':
             message = "straight"
         elif self.color == "g":
@@ -256,12 +260,13 @@ class BehaviorController(DTROS):
         elif self.color == "b":
             message = "right"
         self.use_leds()
-        while not rospy.is_shutdown():
+        if not rospy.is_shutdown():
             if self.color_detect_image is not None:
                 # rospy.loginfo('publishing image')
                 image_msg = self._bridge.cv2_to_imgmsg(self.color_detect_image, encoding="bgr8")
                 self.pub.publish(image_msg)
             if self.line_disappear and not self.executed:
+                # self.string_pub.publish(message)
                 if self.color == "g":
                     self.execute_green_line_behavior()
                 elif self.color == "b":
